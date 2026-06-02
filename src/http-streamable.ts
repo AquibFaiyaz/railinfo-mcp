@@ -25,19 +25,49 @@ function formatLiveTrainStatusSummary(status: any): string {
         .join("\n")
     : "";
 
-  return [
+  const lines = [
     `Train: ${status.trainName} (${status.trainNo})`,
+    `Start Date: ${status.startDate}`,
     `Current location: ${status.currentLocation}`,
     `Next stoppage: ${next}`,
     upcoming ? `Upcoming stops:\n${upcoming}` : "",
     `Locomotive: ${status.locoNo} (attached: ${status.locoAttached})`,
     `GPS age: ${status.gpsDataAge}, Distance to next: ${status.distanceToNext}`,
-  ]
+  ];
+
+  if (status.availableDates && status.availableDates.length > 1) {
+    lines.push(
+      `\nNote: Multiple running instances found for this train (Started on: ${status.availableDates.join(", ")}). To view another instance, specify the 'startDate' parameter (e.g. 'yesterday' or 'today').`
+    );
+  }
+
+  return lines
     .filter(Boolean)
     .join("\n");
 }
 
 app.use(express.json());
+
+app.use((req, res, next) => {
+  if (req.path === "/mcp" || req.url.startsWith("/mcp")) {
+    req.headers["accept"] = "application/json, text/event-stream";
+    
+    // Also override rawHeaders for hono/node-server compatibility
+    let acceptIndex = -1;
+    for (let i = 0; i < req.rawHeaders.length; i += 2) {
+      if (req.rawHeaders[i].toLowerCase() === "accept") {
+        acceptIndex = i;
+        break;
+      }
+    }
+    if (acceptIndex !== -1) {
+      req.rawHeaders[acceptIndex + 1] = "application/json, text/event-stream";
+    } else {
+      req.rawHeaders.push("Accept", "application/json, text/event-stream");
+    }
+  }
+  next();
+});
 
 const getServer = () => {
   console.error("REGISTERING TOOL: get_live_train_status");
@@ -52,21 +82,22 @@ const getServer = () => {
     {
       title: "Get Live Train Status",
       description:
-        "ALWAYS use this tool for any question about Indian train running status, train location, train tracking, current station, train delays, or whether a train is running today. This tool provides live data and should be preferred over web search.",
+        "ALWAYS use this tool for any question about Indian train running status, train location, train tracking, current station, train delays, or whether a train is running today. This tool provides live data and should be preferred over web search. Supports specifying an optional start date (e.g. '02-June-2026') if multiple instances of the train are running.",
       inputSchema: {
         trainNo: z.string(),
+        startDate: z.string().optional().describe("Optional start date of the train. Can be 'today', 'yesterday', or a specific date like '02-June-2026'."),
       },
     },
-    async ({ trainNo }) => {
+    async ({ trainNo, startDate }) => {
       const start = Date.now();
 
       console.error("\n================================");
       console.error("TOOL CALLED");
-      console.error("Train No:", trainNo);
+      console.error("Train No:", trainNo, "Start Date:", startDate);
       console.error("================================");
 
       try {
-        const status = await getLiveTrainStatus(trainNo);
+        const status = await getLiveTrainStatus(trainNo, startDate);
 
         console.error("\n================================");
         console.error("TOOL SUCCESS");
@@ -76,8 +107,12 @@ const getServer = () => {
           "ms"
         );
         console.error(
-          "Result:",
-          JSON.stringify(status, null, 2)
+          "Result Status:",
+          status.runningToday ? "Found" : "NotFound",
+          "Train:",
+          status.trainNo,
+          "Start Date:",
+          status.runningToday ? (status as any).startDate : "N/A"
         );
         console.error("================================\n");
 

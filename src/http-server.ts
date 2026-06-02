@@ -16,13 +16,14 @@ server.registerTool(
   {
     title: "Get Live Train Status",
     description:
-      "Get current live running status of a train and determine if it is running today",
+      "Get current live running status of a train. Supports specifying an optional start date (e.g. '02-June-2026') if multiple instances of the train are running.",
     inputSchema: {
       trainNo: z.string(),
+      startDate: z.string().optional().describe("Optional start date of the train. Can be 'today', 'yesterday', or a specific date like '02-June-2026'."),
     },
   },
-  async ({ trainNo }) => {
-    const status = await getLiveTrainStatus(trainNo);
+  async ({ trainNo, startDate }) => {
+    const status = await getLiveTrainStatus(trainNo, startDate);
 
     return {
       content: [
