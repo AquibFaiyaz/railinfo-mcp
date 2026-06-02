@@ -2,8 +2,38 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import express from "express";
 import { z } from "zod";
-import { getLiveTrainStatus } from "./services/train.service.js";
+import { getLiveTrainStatus, getTrainsAtStation } from "./services/train.service.js";
 const app = express();
+function formatTrainsAtStationSummary(stationCode, hours, trains) {
+    if (!Array.isArray(trains) || trains.length === 0) {
+        return `No upcoming trains found arriving or departing at station ${stationCode.toUpperCase()} in the next ${hours} hours.`;
+    }
+    const lines = [
+        `### 🚉 Upcoming Trains at ${stationCode.toUpperCase()} (Next ${hours} Hours)\n`,
+        `| Train | Schedule (STA/STD) | Live Status (ETA/ETD) | Delay (Arr/Dep) | PF | Current Status / Location |`,
+        `| :--- | :--- | :--- | :--- | :--- | :--- |`
+    ];
+    for (const t of trains) {
+        const trainInfo = `**${t.trainNo}** ${t.trainName || ""}`;
+        const schedule = `${t.sta} / ${t.std}`;
+        const isArrDelayed = t.delayArrival !== "On Time" && t.delayArrival !== "00:00" && t.delayArrival !== "";
+        const isDepDelayed = t.delayDeparture !== "On Time" && t.delayDeparture !== "00:00" && t.delayDeparture !== "";
+        const etaFormatted = isArrDelayed ? `**${t.eta}**` : t.eta;
+        const etdFormatted = isDepDelayed ? `**${t.etd}**` : t.etd;
+        const liveStatus = `${etaFormatted} / ${etdFormatted}`;
+        const delay = `${t.delayArrival || "On Time"} / ${t.delayDeparture || "On Time"}`;
+        const pf = t.platform || "N/A";
+        let current = t.currentLocation || "Spotted";
+        if (t.hasDeparted) {
+            current = `Departed ${stationCode.toUpperCase()}`;
+        }
+        else if (t.hasArrived) {
+            current = `Arrived at ${stationCode.toUpperCase()}`;
+        }
+        lines.push(`| ${trainInfo} | ${schedule} | ${liveStatus} | ${delay} | ${pf} | ${current} |`);
+    }
+    return lines.join("\n");
+}
 function formatLiveTrainStatusSummary(status) {
     if (!status.runningToday) {
         return `Train ${status.trainNo} is not found in live feed. ${status.message ?? ""}`;
@@ -89,6 +119,49 @@ const getServer = () => {
                     {
                         type: "text",
                         text: JSON.stringify(status, null, 2),
+                    },
+                ],
+            };
+        }
+        catch (error) {
+            console.error("\n================================");
+            console.error("TOOL FAILED");
+            console.error("Execution Time:", Date.now() - start, "ms");
+            console.error(error);
+            console.error("================================\n");
+            throw error;
+        }
+    });
+    server.registerTool("get_trains_at_station", {
+        title: "Get Trains at Station (Live Station)",
+        description: "Get all trains arriving at or departing from a station in the next specified hours (default 2 hours). Supports 2 or 4 hours window.",
+        inputSchema: {
+            stationCode: z.string().describe("The 3-4 letter station code (e.g. 'NDLS', 'KIR', 'HWH')"),
+            hours: z.number().optional().default(2).describe("Time window in hours (default: 2, can be 2 or 4)"),
+        },
+    }, async ({ stationCode, hours }) => {
+        const start = Date.now();
+        console.error("\n================================");
+        console.error("TOOL CALLED");
+        console.error("Station Code:", stationCode, "Hours:", hours);
+        console.error("================================");
+        try {
+            const trains = await getTrainsAtStation(stationCode, hours);
+            console.error("\n================================");
+            console.error("TOOL SUCCESS");
+            console.error("Execution Time:", Date.now() - start, "ms");
+            console.error("Result Count:", trains.length);
+            console.error("================================\n");
+            const summary = formatTrainsAtStationSummary(stationCode, hours, trains);
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: summary,
+                    },
+                    {
+                        type: "text",
+                        text: JSON.stringify(trains, null, 2),
                     },
                 ],
             };
