@@ -126,7 +126,7 @@ export async function findTrain(
 ): Promise<{ match: LiveTrain | undefined; allMatches: LiveTrain[] }> {
   const trainsResponse = await getLiveTrains();
 
-  const allMatches = trainsResponse.data.filter(
+  const allMatches = (trainsResponse?.data || []).filter(
     (train) => train.train_no === trainNo
   );
 
@@ -166,7 +166,7 @@ export async function getLiveTrainStatus(
   targetStationCode?: string
 ): Promise<LiveTrainStatusNotFound | LiveTrainStatusFound> {
   const trainsResponse = await getLiveTrains();
-  const allMatches = trainsResponse.data.filter(
+  const allMatches = (trainsResponse?.data || []).filter(
     (train) => train.train_no === trainNo
   );
 
@@ -418,3 +418,170 @@ export async function getLiveTrainStatus(
     targetStationInfo,
   };
 }
+
+export interface NearbyTrainInfo {
+  trainNo: string;
+  trainName: string;
+  actualTime: string;
+  blockSection: string;
+  section: string;
+}
+
+export interface CrossingStationReport {
+  stationCode: string;
+  stationName: string;
+  wttArr: string;
+  wttDep: string;
+  actArr: string;
+  actDep: string;
+  delayArr: string;
+  delayDep: string;
+  crossings: NearbyTrainInfo[];
+  ahead: NearbyTrainInfo[];
+  behind: NearbyTrainInfo[];
+}
+
+export interface TrainRadarReport {
+  runningToday: boolean;
+  trainNo: string;
+  trainName?: string;
+  startDate?: string;
+  currentLocation?: string;
+  lastUpdated?: string;
+  stops?: CrossingStationReport[];
+  availableDates?: string[];
+  message?: string;
+}
+
+export async function getTrainCrossingsAndRadar(
+  trainNo: string,
+  startDateParam?: string,
+  filterStationCode?: string
+): Promise<TrainRadarReport> {
+  const trainsResponse = await getLiveTrains();
+  const allMatches = (trainsResponse?.data || []).filter(
+    (train) => train.train_no === trainNo
+  );
+
+  let resolvedApiDate = "";
+  let train: LiveTrain | undefined = undefined;
+
+  if (startDateParam) {
+    const lower = startDateParam.toLowerCase();
+    let normalizedTarget = "";
+    if (lower === "today") {
+      normalizedTarget = getISTDateString(0).toLowerCase();
+    } else if (lower === "yesterday") {
+      normalizedTarget = getISTDateString(-1).toLowerCase();
+    } else {
+      normalizedTarget = normalizeDate(startDateParam);
+    }
+
+    if (normalizedTarget) {
+      const parts = normalizedTarget.split(" ");
+      if (parts.length >= 2) {
+        const day = parts[0];
+        const month = parts[1];
+        const capitalizedMonth = month.charAt(0).toUpperCase() + month.slice(1);
+        resolvedApiDate = `${day}-${capitalizedMonth}`;
+      }
+
+      train = allMatches.find(
+        (t) => normalizeDate(t.start_date) === normalizedTarget
+      );
+    }
+  }
+
+  if (!resolvedApiDate) {
+    if (allMatches.length > 0) {
+      train = allMatches[0];
+      resolvedApiDate = train.start_date.replace(" ", "-");
+    } else {
+      resolvedApiDate = getISTDateString(0).replace(" ", "-");
+    }
+  }
+
+  const details = await getTrainInfo(trainNo, resolvedApiDate);
+
+  if (!details.train_name) {
+    return {
+      runningToday: false,
+      trainNo,
+      message: `Train ${trainNo} not found in database.`,
+    };
+  }
+
+  if (!details.full_running_schedule || !Array.isArray(details.full_running_schedule)) {
+    return {
+      runningToday: false,
+      trainNo,
+      message: `No detailed running schedule available for train ${trainNo} on start date ${startDateParam || resolvedApiDate}.`,
+    };
+  }
+
+  let currentLocation = "";
+  let lastUpdated = "";
+
+  if (train) {
+    currentLocation = train.station_name;
+    lastUpdated = train.actual_time;
+  } else if (details.current_position) {
+    currentLocation = details.current_position.last_station_location || details.current_location || "";
+    lastUpdated = details.current_position.last_station_location_actual_time || "";
+  }
+
+  const availableDates = allMatches.map((t) => t.start_date);
+
+  let stops = details.full_running_schedule
+    .filter((stop) => {
+      const hasCrossing = stop.Crossing && Array.isArray(stop.Crossing) && stop.Crossing.length > 0;
+      const hasAhead = stop.Ahead && Array.isArray(stop.Ahead) && stop.Ahead.length > 0;
+      const hasBehind = stop.Behind && Array.isArray(stop.Behind) && stop.Behind.length > 0;
+      return hasCrossing || hasAhead || hasBehind;
+    })
+    .map((stop) => {
+      const mapNearby = (tList: any[]): NearbyTrainInfo[] => {
+        if (!Array.isArray(tList)) return [];
+        return tList.map((t) => ({
+          trainNo: t.train_no,
+          trainName: t.train_name,
+          actualTime: t.actual_time,
+          blockSection: t.block_section,
+          section: t.section,
+        }));
+      };
+
+      return {
+        stationCode: stop.station_code,
+        stationName: stop.station_name,
+        wttArr: stop.wtt_arr,
+        wttDep: stop.wtt_dep,
+        actArr: stop.act_arr,
+        actDep: stop.act_dep,
+        delayArr: stop.delay_arr,
+        delayDep: stop.delay_dep,
+        crossings: mapNearby(stop.Crossing),
+        ahead: mapNearby(stop.Ahead),
+        behind: mapNearby(stop.Behind),
+      };
+    });
+
+
+
+  if (filterStationCode) {
+    const normFilter = filterStationCode.trim().toUpperCase();
+    stops = stops.filter((stop) => stop.stationCode === normFilter);
+  }
+
+  return {
+    runningToday: true,
+    trainNo: details.train_no,
+    trainName: details.train_name,
+    startDate: details.start_date,
+    currentLocation,
+    lastUpdated,
+    stops,
+    availableDates: availableDates.length > 1 ? availableDates : undefined,
+  };
+}
+

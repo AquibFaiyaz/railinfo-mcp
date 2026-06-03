@@ -16,3 +16,14 @@ export const TRAINS_AT_STATION_PROMPTS = {
   PARAM_HOURS:
     "Time window in hours (default: 2, can be 2 or 4)",
 };
+
+export const CROSSINGS_AND_RADAR_PROMPTS = {
+  TOOL_DESCRIPTION:
+    "Get all scheduled and active train crossings (trains meeting from the opposite direction), as well as trains running ahead or behind this train in the same block section. Helps users visualize nearby train traffic or track potential signal delays.",
+  PARAM_TRAIN_NO: "The 5-digit train number (e.g., '12357').",
+  PARAM_START_DATE:
+    "Optional start date of the train. Can be 'today', 'yesterday', or a specific date like '02-June-2026'.",
+  PARAM_STATION_CODE:
+    "Optional 3-4 letter station code (e.g. 'NDLS', 'CNB') to filter crossings/radar data to only meetings occurring at or near this specific station.",
+};
+
