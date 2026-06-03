@@ -179,3 +179,211 @@ export async function getTrainsAtStation(
 
   return results.map(({ estimatedTime, ...rest }) => rest);
 }
+
+export async function getTrainsBetweenStations(
+  fromStationCode: string,
+  toStationCode: string,
+  hours: number = 4
+): Promise<any[]> {
+  const normFrom = fromStationCode.trim().toUpperCase();
+  const normTo = toStationCode.trim().toUpperCase();
+
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const projectRoot = path.resolve(__dirname, "..", "..");
+
+  let activeTrains: any[] = [];
+  try {
+    const trainsResponse = await getLiveTrains();
+    activeTrains = trainsResponse.data || [];
+  } catch (err: any) {
+    console.error(`[getTrainsBetweenStations] Error fetching active trains: ${err.message}`);
+  }
+
+  // 1. Get active trains within 120 km of the source station coordinates
+  let nearbyTrainNos: string[] = [];
+  const stationCoords = getStationCoordinates(normFrom);
+  if (stationCoords) {
+    const [stationLat, stationLon] = stationCoords;
+    const nearby = activeTrains.filter((t) => {
+      const dist = haversineDistance(stationLat, stationLon, t.lat, t.lon);
+      return dist <= 120; // 120 km threshold
+    });
+    nearbyTrainNos = nearby.map((t) => t.train_no);
+  }
+
+  // 2. Get scheduled trains from local JSON for the source station
+  let scheduledTrainNos: string[] = [];
+  try {
+    const stationTrainsPath = path.join(projectRoot, "src", "data", "station_trains.json");
+    if (fs.existsSync(stationTrainsPath)) {
+      const rawData = fs.readFileSync(stationTrainsPath, "utf8");
+      const mapping = JSON.parse(rawData);
+      const scheduledStops = mapping[normFrom] || [];
+
+      const now = new Date();
+      const istNow = new Date(now.getTime() + 19800000);
+      const nowMinutes = istNow.getUTCHours() * 60 + istNow.getUTCMinutes();
+
+      const isTimeInWindow = (timeStr: string | null): boolean => {
+        if (!timeStr) return false;
+        const parts = timeStr.split(":");
+        const hour = parseInt(parts[0]) || 0;
+        const minute = parseInt(parts[1]) || 0;
+        const stopMinutes = hour * 60 + minute;
+
+        const startMinutes = nowMinutes - 120; // past 2 hours
+        const endMinutes = nowMinutes + hours * 60; // next N hours
+
+        if (stopMinutes >= startMinutes && stopMinutes <= endMinutes) return true;
+        if (endMinutes > 1440) {
+          const stopMinutesNextDay = stopMinutes + 1440;
+          if (stopMinutesNextDay >= startMinutes && stopMinutesNextDay <= endMinutes) return true;
+        }
+        if (startMinutes < 0) {
+          const stopMinutesPrevDay = stopMinutes - 1440;
+          if (stopMinutesPrevDay >= startMinutes && stopMinutesPrevDay <= endMinutes) return true;
+        }
+        return false;
+      };
+
+      const candidateStops = scheduledStops.filter(
+        (stop: any) => isTimeInWindow(stop.a) || isTimeInWindow(stop.d)
+      );
+      scheduledTrainNos = candidateStops.map((stop: any) => stop.t);
+    }
+  } catch (err: any) {
+    console.error(`[getTrainsBetweenStations] Error reading station_trains.json: ${err.message}`);
+  }
+
+  // 3. Merge candidate train numbers
+  const mergedTrainNos = Array.from(new Set([...scheduledTrainNos, ...nearbyTrainNos]));
+  console.error(
+    `[getTrainsBetweenStations] Station ${normFrom} to ${normTo}: found ${mergedTrainNos.length} candidate trains to check (scheduled in window: ${scheduledTrainNos.length}, active within 120km: ${nearbyTrainNos.length}).`
+  );
+
+  if (mergedTrainNos.length === 0) {
+    return [];
+  }
+
+  // 4. Construct candidates list for API status check (handles multiple active instances per train)
+  const candidates: { trainNo: string; startDate: string; liveLocation: string }[] = [];
+  for (const trainNo of mergedTrainNos) {
+    const activeInstances = activeTrains.filter((t) => t.train_no === trainNo);
+    if (activeInstances.length > 0) {
+      activeInstances.forEach((inst) => {
+        candidates.push({
+          trainNo,
+          startDate: inst.start_date.replace(" ", "-"),
+          liveLocation: inst.station_name,
+        });
+      });
+    } else {
+      candidates.push({
+        trainNo,
+        startDate: getISTDateString(0).replace(" ", "-"),
+        liveLocation: "Not Started yet",
+      });
+    }
+  }
+
+  const results: any[] = [];
+  const now = new Date();
+  const maxWindow = hours * 3600000;
+  const minWindow = -20 * 60 * 1000; // allow trains that departed up to 20 mins ago
+
+  const batchSize = 15;
+  for (let i = 0; i < candidates.length; i += batchSize) {
+    const batch = candidates.slice(i, i + batchSize);
+    const batchPromises = batch.map(async (cand) => {
+      try {
+        const trainNo = cand.trainNo;
+        const details = await getTrainInfo(trainNo, cand.startDate);
+        if (!details || !details.train_public_time_table) return;
+
+        // Find fromStop
+        const fromStopIdx = details.train_public_time_table.findIndex(
+          (s) => s.station_code === normFrom
+        );
+        if (fromStopIdx === -1) return;
+
+        // Find toStop
+        const toStopIdx = details.train_public_time_table.findIndex(
+          (s) => s.station_code === normTo
+        );
+        if (toStopIdx === -1) return;
+
+        // Verify destination is after source in the route
+        if (toStopIdx <= fromStopIdx) return;
+
+        const fromStop = details.train_public_time_table[fromStopIdx];
+        const toStop = details.train_public_time_table[toStopIdx];
+
+        // Only include if the train has not departed the source station yet
+        if (fromStop.has_departed === "1" || fromStop.has_departed === "Yes") {
+          return;
+        }
+
+        const etaStr = fromStop.eta || fromStop.sta;
+        const etdStr = fromStop.etd || fromStop.std;
+
+        if (!etaStr && !etdStr) return;
+
+        let estimatedTime: Date | null = null;
+        if (etaStr) {
+          estimatedTime = parseISTDateTime(etaStr);
+        } else if (etdStr) {
+          estimatedTime = parseISTDateTime(etdStr);
+        }
+
+        if (!estimatedTime) return;
+
+        const timeDiff = estimatedTime.getTime() - now.getTime();
+
+        if (timeDiff >= minWindow && timeDiff <= maxWindow) {
+          results.push({
+            trainNo: details.train_no,
+            trainName: details.train_name,
+            currentLocation: details.current_location || cand.liveLocation,
+            fromStation: {
+              stationCode: fromStop.station_code,
+              stationName: fromStop.station_name,
+              sta: fromStop.sta || "Source",
+              std: fromStop.std || "Destination",
+              eta: fromStop.eta || "Source",
+              etd: fromStop.etd || "Destination",
+              delayArrival: fromStop.delay_arrival || "On Time",
+              delayDeparture: fromStop.delay_departure || "On Time",
+              platform: fromStop.pf || "N/A",
+              hasArrived: fromStop.has_arrived === "1" || fromStop.has_arrived === "Yes",
+              hasDeparted: fromStop.has_departed === "1" || fromStop.has_departed === "Yes",
+            },
+            toStation: {
+              stationCode: toStop.station_code,
+              stationName: toStop.station_name,
+              sta: toStop.sta || "Source",
+              std: toStop.std || "Destination",
+              eta: toStop.eta || "Source",
+              etd: toStop.etd || "Destination",
+              delayArrival: toStop.delay_arrival || "On Time",
+              delayDeparture: toStop.delay_departure || "On Time",
+              platform: toStop.pf || "N/A",
+              hasArrived: toStop.has_arrived === "1" || toStop.has_arrived === "Yes",
+              hasDeparted: toStop.has_departed === "1" || toStop.has_departed === "Yes",
+            },
+            estimatedTime,
+          });
+        }
+      } catch (err: any) {
+        console.error(`[getTrainsBetweenStations] Error checking details for ${cand.trainNo}: ${err.message}`);
+      }
+    });
+
+    await Promise.allSettled(batchPromises);
+  }
+
+  results.sort((a, b) => a.estimatedTime.getTime() - b.estimatedTime.getTime());
+
+  return results.map(({ estimatedTime, ...rest }) => rest);
+}
+

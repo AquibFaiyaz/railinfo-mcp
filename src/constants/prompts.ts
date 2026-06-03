@@ -27,3 +27,13 @@ export const CROSSINGS_AND_RADAR_PROMPTS = {
     "Optional 3-4 letter station code (e.g. 'NDLS', 'CNB') to filter crossings/radar data to only meetings occurring at or near this specific station.",
 };
 
+export const TRAINS_BETWEEN_STATIONS_PROMPTS = {
+  TOOL_DESCRIPTION:
+    "Get all upcoming trains running from a source station towards a destination station in a specified window (default 4 hours), including live expected departure/arrival times, delay status, and platform numbers at both stops. When presenting results to the user, ALWAYS include both the station code and the station name (e.g. 'New Delhi (NDLS)').",
+  PARAM_FROM_STATION_CODE: "The 3-4 letter source station code (e.g. 'ALJN').",
+  PARAM_TO_STATION_CODE: "The 3-4 letter destination station code (e.g. 'NDLS').",
+  PARAM_HOURS:
+    "Time window in hours to look for departing trains at the source station (default: 4, e.g. 2 or 4).",
+};
+
+
