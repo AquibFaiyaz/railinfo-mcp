@@ -595,3 +595,151 @@ export async function getTrainCrossingsAndRadar(
   };
 }
 
+export interface TimetableStop {
+  sr: string;
+  stationCode: string;
+  stationName: string;
+  distance: string;
+  scheduledArrival: string;
+  scheduledDeparture: string;
+  expectedArrival: string;
+  expectedDeparture: string;
+  delayArrival: string;
+  delayDeparture: string;
+  platform: string;
+  hasArrived: boolean;
+  hasDeparted: boolean;
+  arrivalCancelled: boolean;
+  departureCancelled: boolean;
+  rakeReversal: boolean;
+}
+
+export interface TrainTimetableResult {
+  found: boolean;
+  trainNo: string;
+  trainName?: string;
+  trainSubType?: string;
+  startDate?: string;
+  source?: string;
+  destination?: string;
+  currentLocation?: string;
+  currentDelay?: string;
+  timetable?: TimetableStop[];
+  availableDates?: string[];
+  message?: string;
+}
+
+export async function getTrainTimetable(
+  trainNo: string,
+  startDateParam?: string
+): Promise<TrainTimetableResult> {
+  const trainsResponse = await getLiveTrains();
+  const allMatches = (trainsResponse?.data || []).filter(
+    (train) => train.train_no === trainNo
+  );
+
+  let resolvedApiDate = "";
+  let train: LiveTrain | undefined = undefined;
+
+  if (startDateParam) {
+    const lower = startDateParam.toLowerCase();
+    let normalizedTarget = "";
+    if (lower === "today") {
+      normalizedTarget = getISTDateString(0).toLowerCase();
+    } else if (lower === "yesterday") {
+      normalizedTarget = getISTDateString(-1).toLowerCase();
+    } else {
+      normalizedTarget = normalizeDate(startDateParam);
+    }
+
+    if (normalizedTarget) {
+      const parts = normalizedTarget.split(" ");
+      if (parts.length >= 2) {
+        const day = parts[0];
+        const month = parts[1];
+        const capitalizedMonth = month.charAt(0).toUpperCase() + month.slice(1);
+        resolvedApiDate = `${day}-${capitalizedMonth}`;
+      }
+
+      train = allMatches.find(
+        (t) => normalizeDate(t.start_date) === normalizedTarget
+      );
+    }
+  }
+
+  if (!resolvedApiDate) {
+    if (allMatches.length > 0) {
+      train = allMatches[0];
+      resolvedApiDate = train.start_date.replace(" ", "-");
+    } else {
+      resolvedApiDate = getISTDateString(0).replace(" ", "-");
+    }
+  }
+
+  const details = await getTrainInfo(trainNo, resolvedApiDate);
+
+  if (!details.train_name) {
+    return {
+      found: false,
+      trainNo,
+      message: `Train ${trainNo} not found in database.`,
+    };
+  }
+
+  if (!details.train_public_time_table || details.train_public_time_table.length === 0) {
+    return {
+      found: false,
+      trainNo,
+      trainName: details.train_name,
+      message: `No timetable data available for train ${trainNo} on ${startDateParam || resolvedApiDate}.`,
+    };
+  }
+
+  const timetable: TimetableStop[] = details.train_public_time_table.map((stop) => ({
+    sr: stop.sr,
+    stationCode: stop.station_code,
+    stationName: stop.station_name,
+    distance: stop.distance,
+    scheduledArrival: stop.sta || "—",
+    scheduledDeparture: stop.std || "—",
+    expectedArrival: stop.eta || "—",
+    expectedDeparture: stop.etd || "—",
+    delayArrival: stop.delay_arrival || "On Time",
+    delayDeparture: stop.delay_departure || "On Time",
+    platform: stop.pf || "—",
+    hasArrived: stop.has_arrived === "1" || stop.has_arrived === "Yes",
+    hasDeparted: stop.has_departed === "1" || stop.has_departed === "Yes",
+    arrivalCancelled: stop.arrival_cancel_flag === "1" || stop.arrival_cancel_flag === "Yes",
+    departureCancelled: stop.departure_cancel_flag === "1" || stop.departure_cancel_flag === "Yes",
+    rakeReversal: stop.rake_reversal === "1" || stop.rake_reversal === "Yes",
+  }));
+
+  let currentLocation = "";
+  let currentDelay = "";
+
+  if (train) {
+    currentLocation = train.station_name;
+  } else if (details.current_position) {
+    currentLocation = details.current_position.last_station_location || details.current_location || "";
+    currentDelay = details.current_position.last_station_location_delay || "";
+  }
+
+  const source = details.current_position?.train_source || timetable[0]?.stationName || "";
+  const destination = details.current_position?.train_destination || timetable[timetable.length - 1]?.stationName || "";
+
+  const availableDates = allMatches.map((t) => t.start_date);
+
+  return {
+    found: true,
+    trainNo: details.train_no,
+    trainName: details.train_name,
+    trainSubType: details.train_sub_type,
+    startDate: details.start_date,
+    source,
+    destination,
+    currentLocation,
+    currentDelay,
+    timetable,
+    availableDates: availableDates.length > 1 ? availableDates : undefined,
+  };
+}

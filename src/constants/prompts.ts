@@ -36,4 +36,11 @@ export const TRAINS_BETWEEN_STATIONS_PROMPTS = {
     "Time window in hours to look for departing trains at the source station (default: 4, e.g. 2 or 4).",
 };
 
+export const TRAIN_TIMETABLE_PROMPTS = {
+  TOOL_DESCRIPTION:
+    "Get the full route timetable/schedule of a train showing every stop with scheduled and live expected arrival/departure times, delays, platforms, and current status. Use this tool when the user asks for a train's full schedule, route, timetable, or list of stops. When presenting results to the user, ALWAYS include both the station code and the station name (e.g. 'New Delhi (NDLS)').",
+  PARAM_TRAIN_NO: "The 5-digit train number (e.g., '12302').",
+  PARAM_START_DATE:
+    "Optional start date of the train. Can be 'today', 'yesterday', or a specific date like '02-June-2026'.",
+};
 
