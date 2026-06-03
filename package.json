@@ -13,9 +13,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "tsx src/server.ts",
+    "dev": "tsx src/http-streamable.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/http-streamable.js",
+    "dev:stdio": "tsx src/server.ts",
+    "start:stdio": "node dist/server.js"
   },
   "keywords": [],
   "author": "",
