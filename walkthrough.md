@@ -165,3 +165,29 @@ We have implemented a new MCP tool `get_train_route_map` which retrieves the com
 ### 🧪 Verification & Testing
 * Created a scratch test script [scratch/test_route_map.ts](file:///Users/aquibfaiyaz/.gemini/antigravity-ide/brain/3c984891-34bf-4206-9a0b-4ad0f07bb4ee/scratch/test_route_map.ts) to verify the tool's behavior.
 * Verified that the project builds successfully using `npm run build`.
+
+---
+
+## 📡 New Feature: Trains Approaching Station (Radar) Tool
+
+We have implemented a new MCP tool `get_trains_approaching_station` which fetches active, live trains physically approaching a target station within a specified radius (up to 100 km).
+
+### 🛠️ Changes Implemented
+
+1. **Constants**:
+   - Added `TRAINS_APPROACHING_STATION_PROMPTS` under [src/constants/prompts.ts](file:///Users/aquibfaiyaz/Desktop/Learning%20Resources/MCP%20projects/railinfo-mcp/src/constants/prompts.ts).
+
+2. **Service Layer**:
+   - Added `getTrainsApproachingStation` in [src/services/station.service.ts](file:///Users/aquibfaiyaz/Desktop/Learning%20Resources/MCP%20projects/railinfo-mcp/src/services/station.service.ts) to find nearby active trains using spatial calculations, batch-query their timetables, and verify they are approaching (not yet departed) the target station.
+
+3. **Tool Definition**:
+   - Created [src/tools/get_trains_approaching_station.ts](file:///Users/aquibfaiyaz/Desktop/Learning%20Resources/MCP%20projects/railinfo-mcp/src/tools/get_trains_approaching_station.ts) for Zod inputs and markdown table outputs.
+   - Enforced search radius constraints (min: 1 km, max: 100 km, default: 50 km).
+
+4. **Tool Registry**:
+   - Registered `getTrainsApproachingStationTool` inside [src/tools/index.ts](file:///Users/aquibfaiyaz/Desktop/Learning%20Resources/MCP%20projects/railinfo-mcp/src/tools/index.ts).
+
+### 🧪 Verification & Testing
+* Created a scratch test script [scratch/test_approaching.ts](file:///Users/aquibfaiyaz/.gemini/antigravity-ide/brain/3c984891-34bf-4206-9a0b-4ad0f07bb4ee/scratch/test_approaching.ts) to verify the tool's spatial distance filtering and route verification behavior.
+* Verified that the project builds successfully using `npm run build`.
+
