@@ -1,6 +1,6 @@
 import { getLiveTrains, getTrainInfo } from "./rail-api.service.js";
 import { normalizeDate, getISTDateString } from "../utils/date.js";
-import { getStationCoordinates, haversineDistance } from "../utils/geo.js";
+import { getStationCoordinates, haversineDistance, STATION_CODE_MAPPING } from "../utils/geo.js";
 import type {
   LiveTrainsResponse,
   LiveTrain,
@@ -277,14 +277,24 @@ export async function getLiveTrainStatus(
   let targetStationInfo: any = undefined;
   if (targetStationCode && details.train_public_time_table) {
     const normTarget = targetStationCode.trim().toUpperCase();
-    const targetStop = details.train_public_time_table.find(
-      (s) => s.station_code === normTarget
-    );
+    const targetStop = details.train_public_time_table.find((s) => {
+      const code = s.station_code.trim().toUpperCase();
+      return (
+        code === normTarget ||
+        (STATION_CODE_MAPPING[normTarget] &&
+          code === STATION_CODE_MAPPING[normTarget])
+      );
+    });
 
     if (targetStop) {
-      let currentStop = details.train_public_time_table.find(
-        (s) => s.station_code === stationCode
-      );
+      let currentStop = details.train_public_time_table.find((s) => {
+        const code = s.station_code.trim().toUpperCase();
+        return (
+          code === stationCode ||
+          (STATION_CODE_MAPPING[stationCode] &&
+            code === STATION_CODE_MAPPING[stationCode])
+        );
+      });
 
       // Fallback: if the train is at a passing station not in the timetable,
       // use the last departed scheduled stop to compute track distance bounds
