@@ -78,6 +78,7 @@ interface LiveTrainStatusFound {
   fullRunningSchedule: TrainInfoResponse["full_running_schedule"];
   runningAverage: TrainInfoResponse["running_average"];
   availableDates?: string[];
+  targetStationInfo?: any;
 }
 
 function mapStop(
@@ -247,7 +248,8 @@ export async function getTrainInfo(
 
 export async function getLiveTrainStatus(
   trainNo: string,
-  startDateParam?: string
+  startDateParam?: string,
+  targetStationCode?: string
 ): Promise<LiveTrainStatusNotFound | LiveTrainStatusFound> {
   const trainsResponse = await getLiveTrains();
   const allMatches = trainsResponse.data.filter(
@@ -356,6 +358,115 @@ export async function getLiveTrainStatus(
 
   const availableDates = allMatches.map(t => t.start_date);
 
+  let targetStationInfo: any = undefined;
+  if (targetStationCode && details.train_public_time_table) {
+    const normTarget = targetStationCode.trim().toUpperCase();
+    const targetStop = details.train_public_time_table.find(
+      (s) => s.station_code === normTarget
+    );
+
+    if (targetStop) {
+      let currentStop = details.train_public_time_table.find(
+        (s) => s.station_code === stationCode
+      );
+
+      // Fallback: if the train is at a passing station not in the timetable,
+      // use the last departed scheduled stop to compute track distance bounds
+      if (!currentStop) {
+        const departedStops = details.train_public_time_table.filter(
+          (s) => s.has_departed === "1" || s.has_departed === "Yes"
+        );
+        if (departedStops.length > 0) {
+          currentStop = departedStops[departedStops.length - 1];
+        } else {
+          // Default to the first stop (source) if it hasn't departed any stop yet
+          currentStop = details.train_public_time_table[0];
+        }
+      }
+
+      const targetDistance = parseInt(targetStop.distance) || 0;
+      const currentDistance = currentStop ? (parseInt(currentStop.distance) || 0) : 0;
+      
+      const targetIdx = details.train_public_time_table.indexOf(targetStop);
+      const currentIdx = currentStop ? details.train_public_time_table.indexOf(currentStop) : -1;
+
+      let distanceRemainingKm: number | null = null;
+      let stopsRemaining: number | null = null;
+      let alreadyPassed = false;
+
+      if (currentIdx !== -1) {
+        if (targetIdx > currentIdx) {
+          distanceRemainingKm = targetDistance - currentDistance;
+          stopsRemaining = targetIdx - currentIdx;
+        } else if (targetIdx === currentIdx) {
+          distanceRemainingKm = 0;
+          stopsRemaining = 0;
+        } else {
+          alreadyPassed = true;
+        }
+      }
+
+      // Calculate straight-line GPS distance if coordinates are active
+      let gpsDistanceKm: number | null = null;
+      if (latitude && longitude) {
+        try {
+          const __filename = fileURLToPath(import.meta.url);
+          const __dirname = path.dirname(__filename);
+          const projectRoot = path.resolve(__dirname, "..", "..");
+          const coordsPath = path.join(projectRoot, "src", "data", "station_coords.json");
+          if (fs.existsSync(coordsPath)) {
+            const coordsMap = JSON.parse(fs.readFileSync(coordsPath, "utf8"));
+            const targetCoords = coordsMap[normTarget];
+            if (targetCoords) {
+              const [tLat, tLon] = targetCoords;
+              gpsDistanceKm = haversineDistance(latitude, longitude, tLat, tLon);
+            }
+          }
+        } catch (err) {
+          // ignore
+        }
+      }
+      // Extract remaining scheduled stops between current position and target
+      let remainingStations: any[] = [];
+      if (currentIdx !== -1 && targetIdx > currentIdx) {
+        // Include stops from (currentIdx + 1) up to and including targetIdx
+        for (let idx = currentIdx + 1; idx <= targetIdx; idx++) {
+          const s = details.train_public_time_table[idx];
+          remainingStations.push({
+            stationCode: s.station_code,
+            stationName: s.station_name,
+            sta: s.sta || s.eta || "—",
+            eta: s.eta || s.sta || "—",
+            delay: s.delay_arrival || "On Time",
+            platform: s.pf || "—",
+            hasArrived: s.has_arrived === "1" || s.has_arrived === "Yes",
+            hasDeparted: s.has_departed === "1" || s.has_departed === "Yes",
+            distance: s.distance,
+          });
+        }
+      }
+
+      targetStationInfo = {
+        stationCode: targetStop.station_code,
+        stationName: targetStop.station_name,
+        distanceRemainingKm,
+        stopsRemaining,
+        gpsDistanceKm,
+        eta: targetStop.eta || "Source",
+        sta: targetStop.sta || "Source",
+        etd: targetStop.etd || "Destination",
+        std: targetStop.std || "Destination",
+        delayArrival: targetStop.delay_arrival || "On Time",
+        delayDeparture: targetStop.delay_departure || "On Time",
+        platform: targetStop.pf || "N/A",
+        hasArrived: targetStop.has_arrived === "1" || targetStop.has_arrived === "Yes",
+        hasDeparted: targetStop.has_departed === "1" || targetStop.has_departed === "Yes",
+        alreadyPassed,
+        remainingStations,
+      };
+    }
+  }
+
   console.error(`[getLiveTrainStatus] SUCCESS: Found status for ${trainNo} on ${details.start_date} at ${currentStation} (${stationCode})`);
 
   return {
@@ -409,6 +520,7 @@ export async function getLiveTrainStatus(
       details.full_running_schedule,
     runningAverage: details.running_average,
     availableDates: availableDates.length > 1 ? availableDates : undefined,
+    targetStationInfo,
   };
 }
 

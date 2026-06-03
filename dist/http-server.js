@@ -8,13 +8,14 @@ const server = new McpServer({
 });
 server.registerTool("get_live_train_status", {
     title: "Get Live Train Status",
-    description: "Get current live running status of a train. Supports specifying an optional start date (e.g. '02-June-2026') if multiple instances of the train are running.",
+    description: "Get current live running status of a train. Supports specifying an optional start date (e.g. '02-June-2026') if multiple instances of the train are running, and an optional target station code to get localized details relative to that station.",
     inputSchema: {
         trainNo: z.string(),
         startDate: z.string().optional().describe("Optional start date of the train. Can be 'today', 'yesterday', or a specific date like '02-June-2026'."),
+        targetStationCode: z.string().optional().describe("Optional 3-4 letter station code (e.g. 'BSB', 'NDLS') to focus status details relative to this target station."),
     },
-}, async ({ trainNo, startDate }) => {
-    const status = await getLiveTrainStatus(trainNo, startDate);
+}, async ({ trainNo, startDate, targetStationCode }) => {
+    const status = await getLiveTrainStatus(trainNo, startDate, targetStationCode);
     return {
         content: [
             {
