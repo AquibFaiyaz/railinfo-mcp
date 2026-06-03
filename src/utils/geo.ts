@@ -2,6 +2,22 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
+export const STATION_CODE_MAPPING: Record<string, string> = {
+  // New Code -> Old Code
+  "DDU": "MGS",   // Pt. Deen Dayal Upadhyaya Jn -> Mughalsarai
+  "PRYJ": "ALD",  // Prayagraj Jn -> Allahabad
+  "BSBS": "MUV",  // Banaras -> Manduadih
+  "AYC": "FD",    // Ayodhya Cantt -> Faizabad
+  "VGLB": "JHS",  // Virangana Lakshmibai Jhansi -> Jhansi
+
+  // Old Code -> New Code
+  "MGS": "DDU",
+  "ALD": "PRYJ",
+  "MUV": "BSBS",
+  "FD": "AYC",
+  "JHS": "VGLB"
+};
+
 let coordsCache: Record<string, [number, number]> | null = null;
 
 function loadCoords(): Record<string, [number, number]> {
@@ -30,7 +46,11 @@ function loadCoords(): Record<string, [number, number]> {
 export function getStationCoordinates(stationCode: string): [number, number] | null {
   const normCode = stationCode.trim().toUpperCase();
   const coordsMap = loadCoords();
-  return coordsMap[normCode] || null;
+  let coords = coordsMap[normCode];
+  if (!coords && STATION_CODE_MAPPING[normCode]) {
+    coords = coordsMap[STATION_CODE_MAPPING[normCode]];
+  }
+  return coords || null;
 }
 
 export function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {

@@ -3,7 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { getLiveTrains, getTrainInfo } from "./rail-api.service.js";
 import { getISTDateString, parseISTDateTime } from "../utils/date.js";
-import { getStationCoordinates, haversineDistance } from "../utils/geo.js";
+import { getStationCoordinates, haversineDistance, STATION_CODE_MAPPING } from "../utils/geo.js";
 
 export async function getTrainsAtStation(
   stationCode: string,
@@ -42,7 +42,11 @@ export async function getTrainsAtStation(
     if (fs.existsSync(stationTrainsPath)) {
       const rawData = fs.readFileSync(stationTrainsPath, "utf8");
       const mapping = JSON.parse(rawData);
-      const scheduledStops = mapping[normStation] || [];
+      let scheduledStops = mapping[normStation];
+      if (!scheduledStops && STATION_CODE_MAPPING[normStation]) {
+        scheduledStops = mapping[STATION_CODE_MAPPING[normStation]];
+      }
+      scheduledStops = scheduledStops || [];
 
       const now = new Date();
       const istNow = new Date(now.getTime() + 19800000);
@@ -124,9 +128,14 @@ export async function getTrainsAtStation(
         const details = await getTrainInfo(trainNo, cand.startDate);
         if (!details || !details.train_public_time_table) return;
 
-        const liveStop = details.train_public_time_table.find(
-          (s) => s.station_code === normStation
-        );
+        const liveStop = details.train_public_time_table.find((s) => {
+          const code = s.station_code.trim().toUpperCase();
+          return (
+            code === normStation ||
+            (STATION_CODE_MAPPING[normStation] &&
+              code === STATION_CODE_MAPPING[normStation])
+          );
+        });
 
         if (!liveStop) return;
 
@@ -219,7 +228,11 @@ export async function getTrainsBetweenStations(
     if (fs.existsSync(stationTrainsPath)) {
       const rawData = fs.readFileSync(stationTrainsPath, "utf8");
       const mapping = JSON.parse(rawData);
-      const scheduledStops = mapping[normFrom] || [];
+      let scheduledStops = mapping[normFrom];
+      if (!scheduledStops && STATION_CODE_MAPPING[normFrom]) {
+        scheduledStops = mapping[STATION_CODE_MAPPING[normFrom]];
+      }
+      scheduledStops = scheduledStops || [];
 
       const now = new Date();
       const istNow = new Date(now.getTime() + 19800000);
@@ -302,15 +315,25 @@ export async function getTrainsBetweenStations(
         if (!details || !details.train_public_time_table) return;
 
         // Find fromStop
-        const fromStopIdx = details.train_public_time_table.findIndex(
-          (s) => s.station_code === normFrom
-        );
+        const fromStopIdx = details.train_public_time_table.findIndex((s) => {
+          const code = s.station_code.trim().toUpperCase();
+          return (
+            code === normFrom ||
+            (STATION_CODE_MAPPING[normFrom] &&
+              code === STATION_CODE_MAPPING[normFrom])
+          );
+        });
         if (fromStopIdx === -1) return;
 
         // Find toStop
-        const toStopIdx = details.train_public_time_table.findIndex(
-          (s) => s.station_code === normTo
-        );
+        const toStopIdx = details.train_public_time_table.findIndex((s) => {
+          const code = s.station_code.trim().toUpperCase();
+          return (
+            code === normTo ||
+            (STATION_CODE_MAPPING[normTo] &&
+              code === STATION_CODE_MAPPING[normTo])
+          );
+        });
         if (toStopIdx === -1) return;
 
         // Verify destination is after source in the route
