@@ -410,3 +410,110 @@ export async function getTrainsBetweenStations(
   return results.map(({ estimatedTime, ...rest }) => rest);
 }
 
+export async function getTrainsApproachingStation(
+  stationCode: string,
+  radiusKm: number = 50
+): Promise<any[]> {
+  const normStation = stationCode.trim().toUpperCase();
+
+  // 1. Get coordinates of the target station
+  const stationCoords = getStationCoordinates(normStation);
+  if (!stationCoords) {
+    console.error(`[getTrainsApproachingStation] Station coordinates not found for ${normStation}`);
+    return [];
+  }
+  const [stationLat, stationLon] = stationCoords;
+
+  // 2. Fetch all active trains
+  let activeTrains: any[] = [];
+  try {
+    const trainsResponse = await getLiveTrains();
+    activeTrains = trainsResponse.data || [];
+  } catch (err: any) {
+    console.error(`[getTrainsApproachingStation] Error fetching active trains: ${err.message}`);
+    return [];
+  }
+
+  // 3. Filter active trains within radiusKm using haversineDistance
+  const candidates: { trainNo: string; startDate: string; physicalDistance: number; liveLocation: string }[] = [];
+  for (const train of activeTrains) {
+    const dist = haversineDistance(stationLat, stationLon, train.lat, train.lon);
+    if (dist <= radiusKm) {
+      candidates.push({
+        trainNo: train.train_no,
+        startDate: train.start_date.replace(" ", "-"),
+        physicalDistance: dist,
+        liveLocation: train.station_name,
+      });
+    }
+  }
+
+  console.error(
+    `[getTrainsApproachingStation] Station ${normStation}: found ${candidates.length} active trains within ${radiusKm} km.`
+  );
+
+  if (candidates.length === 0) {
+    return [];
+  }
+
+  const results: any[] = [];
+
+  // 4. Batch query details of candidates to verify if they are approaching
+  const batchSize = 15;
+  for (let i = 0; i < candidates.length; i += batchSize) {
+    const batch = candidates.slice(i, i + batchSize);
+    const batchPromises = batch.map(async (cand) => {
+      try {
+        const details = await getTrainInfo(cand.trainNo, cand.startDate);
+        if (!details || !details.train_public_time_table) return;
+
+        // Find the stop for our target station
+        const targetStop = details.train_public_time_table.find((s) => {
+          const code = s.station_code.trim().toUpperCase();
+          return (
+            code === normStation ||
+            (STATION_CODE_MAPPING[normStation] &&
+              code === STATION_CODE_MAPPING[normStation])
+          );
+        });
+
+        if (!targetStop) return; // Train doesn't stop at this station
+
+        // If the train has already departed, it is no longer approaching
+        if (targetStop.has_departed === "1" || targetStop.has_departed === "Yes") {
+          return;
+        }
+
+        results.push({
+          trainNo: details.train_no,
+          trainName: details.train_name,
+          stationCode: targetStop.station_code,
+          stationName: targetStop.station_name,
+          sta: targetStop.sta || "Source",
+          std: targetStop.std || "Destination",
+          eta: targetStop.eta || "Source",
+          etd: targetStop.etd || "Destination",
+          delayArrival: targetStop.delay_arrival || "On Time",
+          delayDeparture: targetStop.delay_departure || "On Time",
+          platform: targetStop.pf || "N/A",
+          hasArrived: targetStop.has_arrived === "1" || targetStop.has_arrived === "Yes",
+          hasDeparted: targetStop.has_departed === "1" || targetStop.has_departed === "Yes",
+          physicalDistance: cand.physicalDistance,
+          currentLocation: details.current_location || cand.liveLocation,
+          lastSpottedAt: details.last_spotted_at || "N/A",
+        });
+      } catch (err: any) {
+        console.error(`[getTrainsApproachingStation] Error checking details for ${cand.trainNo}: ${err.message}`);
+      }
+    });
+
+    await Promise.allSettled(batchPromises);
+  }
+
+  // Sort by physical distance ascending
+  results.sort((a, b) => a.physicalDistance - b.physicalDistance);
+
+  return results;
+}
+
+

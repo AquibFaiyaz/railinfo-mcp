@@ -37,6 +37,11 @@ Get the precise geographic coordinates of a train's entire route.
 * **Station Coordinates**: Look up latitude/longitude for every stop on the train's route.
 * **Map Integration**: Generates clickable Google Maps links for every station to plot or visualize the path.
 
+### 7. Trains Approaching Station (Radar) (`get_trains_approaching_station`)
+Get active, live trains physically approaching a station within a specified radius (default 50 km, max 100 km).
+* **Spatial Tracking**: Tracks live coordinates of active trains approaching the station.
+* **Smart Filter**: Automatically ignores trains that have already departed or are moving away from the station.
+
 ---
 
 ## 🛠️ Configuration
