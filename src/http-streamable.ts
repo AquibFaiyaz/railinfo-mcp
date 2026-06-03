@@ -47,12 +47,37 @@ const transport = new StreamableHTTPServerTransport({
   sessionIdGenerator: () => crypto.randomUUID(),
 });
 
+// Keep track of the initialization state
+let isInitialized = false;
+
 // Route both GET (to establish SSE) and POST (to send JSON-RPC calls) to the transport
 app.all("/mcp", async (req, res) => {
   console.error(`\n========== [${req.method}] /mcp ==========`);
-  console.error(`URL: ${req.url}`);
-  console.error(`Query: ${JSON.stringify(req.query)}`);
-  console.error(`Headers: ${JSON.stringify(req.headers)}`);
+  console.error(`Method: ${req.body?.method}, ID: ${req.body?.id}`);
+
+  // Intercept duplicate initialize requests to prevent "Server already initialized" errors
+  if (req.body?.method === "initialize") {
+    if (isInitialized) {
+      console.error("Server is already initialized. Intercepting and returning success...");
+      return res.json({
+        jsonrpc: "2.0",
+        id: req.body.id,
+        result: {
+          protocolVersion: req.body.params?.protocolVersion || "2025-11-25",
+          capabilities: {
+            tools: {},
+            resources: {},
+            prompts: {}
+          },
+          serverInfo: {
+            name: "railinfo-mcp",
+            version: "1.0.0"
+          }
+        }
+      });
+    }
+    isInitialized = true;
+  }
   
   try {
     await transport.handleRequest(req, res, req.body);
