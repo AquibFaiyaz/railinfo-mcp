@@ -3,7 +3,11 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const baseURL = process.env.RAILJOURNAL_BASE_URL || "https://railjournal.in";
+const baseURL = process.env.RAIL_API_BASE_URL;
+
+if (!baseURL) {
+  throw new Error("RAIL_API_BASE_URL environment variable is not defined");
+}
 
 export const railApi = axios.create({
   baseURL,

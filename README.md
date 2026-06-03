@@ -22,17 +22,16 @@ Get all trains arriving or departing at a station in the next 2 or 4 hours (matc
 ---
 
 ## 🛠️ Configuration
-
 The server reads configuration from a `.env` file at the root.
 
 Create a `.env` file (copied from `.env.example`):
 ```env
 CACHE_TIME=60
-RAILJOURNAL_BASE_URL=https://railjournal.in
+RAIL_API_BASE_URL=https://api.example.com
 ```
 
 * `CACHE_TIME`: Cache TTL in seconds for API responses.
-* `RAILJOURNAL_BASE_URL`: The base URL for the rail status API source.
+* `RAIL_API_BASE_URL`: The base URL for the rail status API source.
 
 ---
 
@@ -59,16 +58,16 @@ To integrate this server with Claude Desktop or other MCP clients, add it to you
   "mcpServers": {
     "railinfo-mcp": {
       "command": "node",
-      "args": ["/Users/YOUR_USERNAME/Desktop/Learning Resources/MCP projects/railinfo-mcp/dist/server.js"],
+      "args": ["/path/to/your/project/railinfo-mcp/dist/server.js"],
       "env": {
-        "RAILJOURNAL_BASE_URL": "https://railjournal.in",
+        "RAIL_API_BASE_URL": "https://api.example.com",
         "CACHE_TIME": "60"
       }
     }
   }
 }
 ```
-*(Make sure to replace `/Users/YOUR_USERNAME/...` with the absolute path to your project folder).*
+*(Make sure to replace `/path/to/your/project/railinfo-mcp/dist/server.js` with the actual absolute path to the compiled `dist/server.js` file on your system).*
 
 ---
 
