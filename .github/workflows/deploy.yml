@@ -1,0 +1,53 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH and Deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /var/www/railinfo-mcp
+            
+            # Initialize repo or pull the main branch
+            if [ ! -d ".git" ]; then
+              echo "Cloning repository..."
+              git clone https://github.com/AquibFaiyaz/railinfo-mcp.git .
+            fi
+            
+            echo "Fetching latest changes..."
+            git fetch --all
+            git checkout main
+            git pull origin main
+            
+            # Build the Docker image
+            echo "Building Docker image..."
+            docker build -t railinfo-mcp .
+            
+            # Stop and remove the old container if it exists
+            echo "Stopping old container..."
+            docker stop railinfo-mcp || true
+            docker rm railinfo-mcp || true
+            
+            # Start the new Docker container
+            echo "Starting new container..."
+            docker run -d \
+              --name railinfo-mcp \
+              --restart unless-stopped \
+              -p 3000:3000 \
+              --env-file /var/www/railinfo-mcp/.env \
+              railinfo-mcp
+            
+            # Clean up dangling images to save disk space
+            echo "Cleaning up old images..."
+            docker image prune -f
