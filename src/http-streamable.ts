@@ -50,6 +50,10 @@ const transport = new StreamableHTTPServerTransport({
 // Route both GET (to establish SSE) and POST (to send JSON-RPC calls) to the transport
 app.all("/mcp", async (req, res) => {
   console.error(`\n========== [${req.method}] /mcp ==========`);
+  console.error(`URL: ${req.url}`);
+  console.error(`Query: ${JSON.stringify(req.query)}`);
+  console.error(`Headers: ${JSON.stringify(req.headers)}`);
+  
   try {
     await transport.handleRequest(req, res, req.body);
   } catch (error) {
