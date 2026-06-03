@@ -26,7 +26,7 @@ The server reads configuration from a `.env` file at the root.
 
 Create a `.env` file (copied from `.env.example`):
 ```env
-CACHE_TIME=90
+CACHE_TIME=60
 RAIL_API_BASE_URL=https://api.example.com
 ```
 
