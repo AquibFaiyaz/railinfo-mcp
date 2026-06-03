@@ -98,6 +98,9 @@ function mapStop(
 function getNextStoppage(
   timetable: TrainInfoResponse["train_public_time_table"]
 ): NextStoppage | null {
+  if (!timetable || !Array.isArray(timetable)) {
+    return null;
+  }
   const next = timetable.find(
     (stop) => stop.has_arrived !== "1" || stop.has_departed !== "1"
   );
@@ -112,6 +115,9 @@ function getNextStoppage(
 function getUpcomingStops(
   timetable: TrainInfoResponse["train_public_time_table"]
 ): UpcomingStop[] {
+  if (!timetable || !Array.isArray(timetable)) {
+    return [];
+  }
   return timetable
     .filter(
       (stop) => stop.has_arrived !== "1" || stop.has_departed !== "1"
@@ -125,8 +131,9 @@ export async function findTrain(
   startDate?: string
 ): Promise<{ match: LiveTrain | undefined; allMatches: LiveTrain[] }> {
   const trainsResponse = await getLiveTrains();
+  const data = trainsResponse?.data || [];
 
-  const allMatches = trainsResponse.data.filter(
+  const allMatches = data.filter(
     (train) => train.train_no === trainNo
   );
 
@@ -166,7 +173,8 @@ export async function getLiveTrainStatus(
   targetStationCode?: string
 ): Promise<LiveTrainStatusNotFound | LiveTrainStatusFound> {
   const trainsResponse = await getLiveTrains();
-  const allMatches = trainsResponse.data.filter(
+  const data = trainsResponse?.data || [];
+  const allMatches = data.filter(
     (train) => train.train_no === trainNo
   );
 
@@ -229,7 +237,7 @@ export async function getLiveTrainStatus(
   console.error(`[getLiveTrainStatus] Fetching details for ${trainNo} with API date "${resolvedApiDate}-2026"`);
   const details = await getTrainInfo(trainNo, resolvedApiDate);
 
-  if (!details.train_name) {
+  if (!details || !details.train_name) {
     console.error(`[getLiveTrainStatus] Train ${trainNo} not found in database.`);
     return {
       runningToday: false,
