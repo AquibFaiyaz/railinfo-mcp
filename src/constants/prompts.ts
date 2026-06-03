@@ -44,3 +44,12 @@ export const TRAIN_TIMETABLE_PROMPTS = {
     "Optional start date of the train. Can be 'today', 'yesterday', or a specific date like '02-June-2026'.",
 };
 
+export const TRAIN_ROUTE_MAP_PROMPTS = {
+  TOOL_DESCRIPTION:
+    "Get the complete geographic route (station coordinates) of a train showing every stop, distance, latitude, longitude, and interactive map links. Use this tool when the user asks for a train's route map, coordinates, plotting the route, or visual map data. When presenting results to the user, ALWAYS include both the station code and the station name (e.g. 'New Delhi (NDLS)').",
+  PARAM_TRAIN_NO: "The 5-digit train number (e.g., '12302').",
+  PARAM_START_DATE:
+    "Optional start date of the train. Can be 'today', 'yesterday', or a specific date like '02-June-2026'.",
+};
+
+

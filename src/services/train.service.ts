@@ -743,3 +743,62 @@ export async function getTrainTimetable(
     availableDates: availableDates.length > 1 ? availableDates : undefined,
   };
 }
+
+export interface RouteMapStop extends TimetableStop {
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export interface TrainRouteMapResult {
+  found: boolean;
+  trainNo: string;
+  trainName?: string;
+  trainSubType?: string;
+  startDate?: string;
+  source?: string;
+  destination?: string;
+  currentLocation?: string;
+  currentDelay?: string;
+  route?: RouteMapStop[];
+  availableDates?: string[];
+  message?: string;
+}
+
+export async function getTrainRouteMap(
+  trainNo: string,
+  startDateParam?: string
+): Promise<TrainRouteMapResult> {
+  const timetableResult = await getTrainTimetable(trainNo, startDateParam);
+
+  if (!timetableResult.found) {
+    return {
+      found: false,
+      trainNo: timetableResult.trainNo,
+      message: timetableResult.message,
+    };
+  }
+
+  const route: RouteMapStop[] = (timetableResult.timetable || []).map((stop) => {
+    const coords = getStationCoordinates(stop.stationCode);
+    return {
+      ...stop,
+      latitude: coords ? coords[0] : null,
+      longitude: coords ? coords[1] : null,
+    };
+  });
+
+  return {
+    found: true,
+    trainNo: timetableResult.trainNo,
+    trainName: timetableResult.trainName,
+    trainSubType: timetableResult.trainSubType,
+    startDate: timetableResult.startDate,
+    source: timetableResult.source,
+    destination: timetableResult.destination,
+    currentLocation: timetableResult.currentLocation,
+    currentDelay: timetableResult.currentDelay,
+    route,
+    availableDates: timetableResult.availableDates,
+  };
+}
+
