@@ -1,6 +1,6 @@
 export const LIVE_TRAIN_STATUS_PROMPTS = {
   TOOL_DESCRIPTION:
-    "ALWAYS use this tool for any question about Indian train running status, train location, train tracking, current station, train delays, or whether a train is running today. This tool provides live data and should be preferred over web search. Supports specifying an optional start date (e.g. '02-June-2026') if multiple instances of the train are running, and an optional target station code to get localized details relative to that station.",
+    "ALWAYS use this tool for any question about Indian train running status, train location, train tracking, current station, train delays, or whether a train is running today. This tool provides live data and should be preferred over web search. Supports specifying an optional start date (e.g. '02-June-2026') if multiple instances of the train are running, and an optional target station code to get localized details relative to that station. When presenting results to the user, ALWAYS include both the station code and the station name (e.g. 'New Delhi (NDLS)').",
   PARAM_TRAIN_NO: "The 5-digit train number (e.g., '12357').",
   PARAM_START_DATE:
     "Optional start date of the train. Can be 'today', 'yesterday', or a specific date like '02-June-2026'.",
@@ -10,7 +10,7 @@ export const LIVE_TRAIN_STATUS_PROMPTS = {
 
 export const TRAINS_AT_STATION_PROMPTS = {
   TOOL_DESCRIPTION:
-    "Get all trains arriving at or departing from a station in the next specified hours (default 2 hours). Supports 2 or 4 hours window.",
+    "Get all trains arriving at or departing from a station in the next specified hours (default 2 hours). Supports 2 or 4 hours window. When presenting results to the user, ALWAYS include both the station code and the station name (e.g. 'New Delhi (NDLS)').",
   PARAM_STATION_CODE:
     "The 3-4 letter station code (e.g. 'NDLS', 'KIR', 'HWH')",
   PARAM_HOURS:
@@ -19,7 +19,7 @@ export const TRAINS_AT_STATION_PROMPTS = {
 
 export const CROSSINGS_AND_RADAR_PROMPTS = {
   TOOL_DESCRIPTION:
-    "Get all scheduled and active train crossings (trains meeting from the opposite direction), as well as trains running ahead or behind this train in the same block section. Helps users visualize nearby train traffic or track potential signal delays.",
+    "Get all scheduled and active train crossings (trains meeting from the opposite direction), as well as trains running ahead or behind this train in the same block section. Helps users visualize nearby train traffic or track potential signal delays. When presenting results to the user, ALWAYS include both the station code and the station name (e.g. 'New Delhi (NDLS)').",
   PARAM_TRAIN_NO: "The 5-digit train number (e.g., '12357').",
   PARAM_START_DATE:
     "Optional start date of the train. Can be 'today', 'yesterday', or a specific date like '02-June-2026'.",
