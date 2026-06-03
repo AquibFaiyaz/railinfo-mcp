@@ -33,54 +33,100 @@ app.use((req, res, next) => {
   next();
 });
 
-// Initialize a single global MCP server
-const server = new McpServer({
-  name: "railinfo-mcp",
-  version: "1.0.0",
-});
+// Map to store independent sessions: sessionId -> { server, transport, cleanupTimer }
+interface Session {
+  server: McpServer;
+  transport: StreamableHTTPServerTransport;
+  cleanupTimer: NodeJS.Timeout;
+}
+const sessions = new Map<string, Session>();
 
-// Register all tools to the global server
-registerAllTools(server, { formatMarkdown: true });
+// Helper to create and initialize a new isolated session
+const createSession = (sessionId: string): Session => {
+  console.error(`[SessionManager] Creating new isolated session: ${sessionId}`);
+  
+  const server = new McpServer({
+    name: "railinfo-mcp",
+    version: "1.0.0",
+  });
+  
+  registerAllTools(server, { formatMarkdown: true });
+  
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: () => sessionId,
+  });
 
-// Initialize a single global transport with session support
-const transport = new StreamableHTTPServerTransport({
-  sessionIdGenerator: () => crypto.randomUUID(),
-});
+  server.connect(transport).catch((err) => {
+    console.error(`[SessionManager] Error connecting server for session ${sessionId}:`, err);
+  });
 
-// Keep track of the initialization state
-let isInitialized = false;
+  // Setup session cleanup to prevent memory leaks (30 minutes of inactivity)
+  const setupCleanupTimer = (id: string): NodeJS.Timeout => {
+    return setTimeout(() => {
+      console.error(`[SessionManager] Cleaning up inactive session: ${id}`);
+      const activeSession = sessions.get(id);
+      if (activeSession) {
+        try {
+          activeSession.transport.close();
+          activeSession.server.close();
+        } catch (e) {}
+        sessions.delete(id);
+      }
+    }, 30 * 60 * 1000); // 30 minutes
+  };
+
+  const session: Session = {
+    server,
+    transport,
+    cleanupTimer: setupCleanupTimer(sessionId)
+  };
+  
+  sessions.set(sessionId, session);
+  return session;
+};
 
 // Route both GET (to establish SSE) and POST (to send JSON-RPC calls) to the transport
 app.all("/mcp", async (req, res) => {
-  console.error(`\n========== [${req.method}] /mcp ==========`);
-  console.error(`Method: ${req.body?.method}, ID: ${req.body?.id}`);
+  const method = req.body?.method;
+  const id = req.body?.id;
+  
+  // Extract the session ID from headers or query parameters
+  const sessionId = (req.headers["mcp-session-id"] || req.query.sessionId) as string;
 
-  // Intercept duplicate initialize requests to prevent "Server already initialized" errors
-  if (req.body?.method === "initialize") {
-    if (isInitialized) {
-      console.error("Server is already initialized. Intercepting and returning success...");
-      return res.json({
-        jsonrpc: "2.0",
-        id: req.body.id,
-        result: {
-          protocolVersion: req.body.params?.protocolVersion || "2025-11-25",
-          capabilities: {
-            tools: {},
-            resources: {},
-            prompts: {}
-          },
-          serverInfo: {
-            name: "railinfo-mcp",
-            version: "1.0.0"
-          }
-        }
-      });
+  console.error(`\n========== [${req.method}] /mcp ==========`);
+  console.error(`Method: ${method}, ID: ${id}`);
+  console.error(`Session ID: ${sessionId}`);
+
+  let session: Session;
+
+  if (sessionId) {
+    const existingSession = sessions.get(sessionId);
+    if (existingSession) {
+      session = existingSession;
+      
+      // Refresh the session inactivity timer
+      clearTimeout(session.cleanupTimer);
+      session.cleanupTimer = setTimeout(() => {
+        console.error(`[SessionManager] Cleaning up inactive session: ${sessionId}`);
+        try {
+          session.transport.close();
+          session.server.close();
+        } catch (e) {}
+        sessions.delete(sessionId);
+      }, 30 * 60 * 1000);
+      
+    } else {
+      console.error(`[SessionManager] Session ${sessionId} not found. Re-creating...`);
+      session = createSession(sessionId);
     }
-    isInitialized = true;
+  } else {
+    // Generate a fresh session ID if none was sent (typically the first POST /mcp initialize)
+    const newSessionId = crypto.randomUUID();
+    session = createSession(newSessionId);
   }
   
   try {
-    await transport.handleRequest(req, res, req.body);
+    await session.transport.handleRequest(req, res, req.body);
   } catch (error) {
     console.error("Error handling MCP request:", error);
     if (!res.headersSent) {
@@ -96,16 +142,6 @@ app.all("/mcp", async (req, res) => {
   }
 });
 
-// Establish the connection and start listening
-const start = async () => {
-  console.error("Connecting server to transport...");
-  await server.connect(transport);
-  
-  app.listen(3000, () => {
-    console.error("RailInfo Streamable MCP listening on port 3000");
-  });
-};
-
-start().catch((err) => {
-  console.error("Fatal startup error:", err);
+app.listen(3000, () => {
+  console.error("RailInfo Streamable MCP listening on port 3000");
 });
