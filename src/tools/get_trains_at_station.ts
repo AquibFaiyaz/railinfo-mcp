@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getTrainsAtStation } from "../services/train.service.js";
+import { getTrainsAtStation } from "../services/station.service.js";
 import { TRAINS_AT_STATION_PROMPTS } from "../constants/prompts.js";
 import { McpTool } from "./types.js";
 
