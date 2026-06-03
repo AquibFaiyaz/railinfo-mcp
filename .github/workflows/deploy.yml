@@ -19,15 +19,16 @@ jobs:
           script: |
             cd /var/www/railinfo-mcp
             
-            # Initialize repo or pull the main branch
+            # Initialize git if not already present (supports non-empty directory containing .env)
             if [ ! -d ".git" ]; then
-              echo "Cloning repository..."
-              git clone https://github.com/AquibFaiyaz/railinfo-mcp.git .
+              echo "Initializing git repository..."
+              git init
+              git remote add origin https://github.com/AquibFaiyaz/railinfo-mcp.git
             fi
             
             echo "Fetching latest changes..."
             git fetch --all
-            git checkout main
+            git checkout -f main
             git pull origin main
             
             # Build the Docker image
