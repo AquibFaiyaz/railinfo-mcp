@@ -67,7 +67,7 @@ We migrated the application runner deployment from PM2 to Docker, configuring a 
 
 ### 2. GitHub Actions Deployment Workflow
 *   **[deploy.yml](file:///Users/aquibfaiyaz/Desktop/Learning%20Resources/MCP%20projects/railinfo-mcp/.github/workflows/deploy.yml)**: Created an SSH-based deployment workflow. On pushing/merging changes to the `main` branch, the workflow:
-    1. Connects securely via SSH to the VPS (`166.0.244.81`).
+    1. Connects securely via SSH to the VPS (using IP configured in GitHub secrets).
     2. Initializes/updates the git repository at `/var/www/railinfo-mcp` (coexisting with the server's `.env`).
     3. Builds the Docker image locally on the VPS.
     4. Stops and removes any older instance of the container.
@@ -80,11 +80,11 @@ We migrated the application runner deployment from PM2 to Docker, configuring a 
 
 To allow seamless integration with web-based clients such as ChatGPT (which requires secure HTTPS connections), we configured a reverse proxy and obtained an SSL certificate:
 
-1.  **Nginx Reverse Proxy**: Configured Nginx on the host VPS to listen on ports `80` (HTTP) and `443` (HTTPS) and forward all traffic destined for `aquib.online` or `www.aquib.online` directly to the Docker container running locally on port `3000`.
-2.  **Let's Encrypt SSL**: Run `certbot` to request a free SSL certificate for `aquib.online` and automatic HTTP-to-HTTPS redirect.
+1.  **Nginx Reverse Proxy**: Configured Nginx on the host VPS to listen on ports `80` (HTTP) and `443` (HTTPS) and forward all traffic destined for your domain directly to the Docker container running locally on port `3000`.
+2.  **Let's Encrypt SSL**: Run `certbot` to request a free SSL certificate for your domain and automatic HTTP-to-HTTPS redirect.
 3.  **Endpoint verification**: Tested a secure query from outside the VPS to the secure URL:
     ```bash
-    curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_live_train_status","arguments":{"trainNo":"12951","startDate":"03-Jun-2026"}}}' https://aquib.online/mcp
+    curl -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_live_train_status","arguments":{"trainNo":"12951","startDate":"03-Jun-2026"}}}' https://your-domain.com/mcp
     ```
     This securely resolves and streams the JSON-RPC response successfully through the SSL pipeline.
 
