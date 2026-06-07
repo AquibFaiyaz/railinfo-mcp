@@ -3,10 +3,88 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import express from "express";
 import { registerAllTools } from "./tools/index.js";
 import crypto from "crypto";
+import { traceStore, logger } from "./utils/logger.js";
 
 const app = express();
 
 app.use(express.json());
+
+// Express Tracing and Transaction Logging Middleware
+app.use((req, res, next) => {
+  if (req.path !== "/mcp" && !req.path.startsWith("/mcp")) {
+    return next();
+  }
+
+  // Generate or carry forward trace ID
+  const traceId = (req.headers["x-trace-id"] || crypto.randomUUID()) as string;
+
+  traceStore.run({ traceId }, () => {
+    const startTime = Date.now();
+
+    // Intercept response stream/payload chunks
+    const originalWrite = res.write;
+    const originalEnd = res.end;
+    const chunks: Buffer[] = [];
+
+    res.write = function (chunk: any, ...args: any[]) {
+      if (chunk) {
+        chunks.push(Buffer.from(chunk));
+      }
+      return (originalWrite as any).apply(res, [chunk, ...args]);
+    };
+
+    res.end = function (chunk: any, ...args: any[]) {
+      if (chunk) {
+        chunks.push(Buffer.from(chunk));
+      }
+      const durationMs = Date.now() - startTime;
+      const responseBody = Buffer.concat(chunks).toString("utf8");
+
+      // Ship log record asynchronously
+      setImmediate(() => {
+        try {
+          let parsedResponse = responseBody;
+          try {
+            if (responseBody.startsWith("data:")) {
+              const match = responseBody.match(/data:\s*({.*})/);
+              parsedResponse = match ? JSON.parse(match[1]) : responseBody;
+            } else {
+              parsedResponse = JSON.parse(responseBody);
+            }
+          } catch (e) {
+            // Raw text response
+          }
+
+          logger.info({
+            message: `Incoming MCP request processed: ${req.method} ${req.path}`,
+            type: "transaction",
+            payload: {
+              direction: "incoming",
+              request: {
+                method: req.method,
+                url: req.originalUrl || req.url,
+                headers: req.headers,
+                body: req.body || null,
+              },
+              response: {
+                status: res.statusCode,
+                headers: res.getHeaders(),
+                body: parsedResponse,
+              },
+              durationMs,
+            },
+          });
+        } catch (err: any) {
+          console.error("[LoggerMiddleware] Error building logging payload:", err.message);
+        }
+      });
+
+      return (originalEnd as any).apply(res, [chunk, ...args]);
+    };
+
+    next();
+  });
+});
 
 // Enable CORS and adjust headers for SSE streaming compatibility
 app.use((req, res, next) => {
