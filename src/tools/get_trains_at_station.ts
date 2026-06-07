@@ -8,12 +8,17 @@ function formatTrainsAtStationSummary(
   hours: number,
   trains: any[]
 ): string {
+  let stationLabel = stationCode.toUpperCase();
+  if (Array.isArray(trains) && trains.length > 0 && trains[0].stationName) {
+    stationLabel = `${trains[0].stationName} (${trains[0].stationCode})`;
+  }
+
   if (!Array.isArray(trains) || trains.length === 0) {
-    return `No upcoming trains found arriving or departing at station ${stationCode.toUpperCase()} in the next ${hours} hours.`;
+    return `No upcoming trains found arriving or departing at station **${stationLabel}** in the next ${hours} hours.`;
   }
 
   const lines = [
-    `### 🚉 Upcoming Trains at ${stationCode.toUpperCase()} (Next ${hours} Hours)\n`,
+    `### 🚉 Upcoming Trains at ${stationLabel} (Next ${hours} Hours)\n`,
     `| Train | Schedule (STA/STD) | Live Status (ETA/ETD) | Delay (Arr/Dep) | PF | Current Status / Location |`,
     `| :--- | :--- | :--- | :--- | :--- | :--- |`,
   ];
@@ -40,9 +45,9 @@ function formatTrainsAtStationSummary(
 
     let current = t.currentLocation || "Spotted";
     if (t.hasDeparted) {
-      current = `Departed ${stationCode.toUpperCase()}`;
+      current = `Departed ${stationLabel}`;
     } else if (t.hasArrived) {
-      current = `Arrived at ${stationCode.toUpperCase()}`;
+      current = `Arrived at ${stationLabel}`;
     }
 
     lines.push(

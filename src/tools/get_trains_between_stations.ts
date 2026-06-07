@@ -11,13 +11,27 @@ function formatTrainsBetweenStationsSummary(
 ): string {
   const fromUpper = fromStation.toUpperCase();
   const toUpper = toStation.toUpperCase();
+
+  let fromLabel = fromUpper;
+  let toLabel = toUpper;
+
+  if (Array.isArray(trains) && trains.length > 0) {
+    const first = trains[0];
+    if (first.fromStation?.stationName) {
+      fromLabel = `${first.fromStation.stationName} (${fromUpper})`;
+    }
+    if (first.toStation?.stationName) {
+      toLabel = `${first.toStation.stationName} (${toUpper})`;
+    }
+  }
+
   if (!Array.isArray(trains) || trains.length === 0) {
-    return `No upcoming trains found running from **${fromUpper}** to **${toUpper}** in the next ${hours} hours.`;
+    return `No upcoming trains found running from **${fromLabel}** to **${toLabel}** in the next ${hours} hours.`;
   }
 
   const lines = [
-    `### 🛤️ Live Trains: ${fromUpper} ➡️ ${toUpper} (Next ${hours} Hours)\n`,
-    `| Train | Status at ${fromUpper} | Status at ${toUpper} | Delay | Current Location |`,
+    `### 🛤️ Live Trains: ${fromLabel} ➡️ ${toLabel} (Next ${hours} Hours)\n`,
+    `| Train | Status at ${fromLabel} | Status at ${toLabel} | Delay | Current Location |`,
     `| :--- | :--- | :--- | :--- | :--- |`,
   ];
 

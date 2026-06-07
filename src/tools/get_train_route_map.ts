@@ -16,7 +16,16 @@ function formatRouteMapSummary(result: any): string {
   ];
 
   if (result.currentLocation) {
-    lines.push(`Current Location: ${result.currentLocation}${result.currentDelay ? ` (Delay: ${result.currentDelay})` : ""}`);
+    let locLabel = result.currentLocation;
+    if (result.route && result.route.length > 0) {
+      const match = result.route.find(
+        (s: any) => s.stationCode.toUpperCase() === result.currentLocation.toUpperCase()
+      );
+      if (match) {
+        locLabel = `${match.stationName} (${match.stationCode})`;
+      }
+    }
+    lines.push(`Current Location: ${locLabel}${result.currentDelay ? ` (Delay: ${result.currentDelay})` : ""}`);
   }
 
   if (result.route && result.route.length > 0) {
