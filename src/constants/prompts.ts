@@ -54,12 +54,21 @@ export const TRAIN_ROUTE_MAP_PROMPTS = {
 
 export const TRAINS_APPROACHING_STATION_PROMPTS = {
   TOOL_DESCRIPTION:
-    "Get all active, live trains physically approaching a station within a specified radius (default 50 km, max 100 km). This tool is spatial (distance-based radar) and tracks live GPS coordinates of active trains approaching the station, ignoring schedule slots. When presenting results to the user, ALWAYS include both the station code and the station name (e.g. 'New Delhi (NDLS)').",
+    "Get all active, live trains physically approaching a station within a specified radius (default 50 km, max 600 km). This tool is spatial (distance-based radar) and tracks live GPS coordinates of active trains approaching the station, ignoring schedule slots. When presenting results to the user, ALWAYS include both the station code and the station name (e.g. 'New Delhi (NDLS)').",
   PARAM_STATION_CODE:
     "The 3-4 letter target station code (e.g., 'NDLS', 'CNB', 'HWH').",
   PARAM_RADIUS_KM:
-    "Optional physical search radius in kilometers (default: 50, maximum: 100).",
+    "Optional physical search radius in kilometers (default: 50, maximum: 600).",
 };
+
+export const GET_TRAIN_SPEED_PROMPTS = {
+  TOOL_DESCRIPTION:
+    "Get the current speed and GPS tracking information of an active train. Returns speed in km/h, locomotive details, data source (e.g., GPS/RTIS vs NTES), and data freshness age.",
+  PARAM_TRAIN_NO: "The 5-digit train number (e.g., '15484').",
+  PARAM_START_DATE:
+    "Optional start date of the train. Can be 'today', 'yesterday', or a specific date like '02-June-2026'.",
+};
+
 
 
 

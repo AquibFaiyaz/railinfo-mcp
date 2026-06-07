@@ -6,6 +6,7 @@ import { getTrainsBetweenStationsTool } from "./get_trains_between_stations.js";
 import { getTrainTimetableTool } from "./get_train_timetable.js";
 import { getTrainRouteMapTool } from "./get_train_route_map.js";
 import { getTrainsApproachingStationTool } from "./get_trains_approaching_station.js";
+import { getTrainSpeedTool } from "./get_train_speed.js";
 import { McpTool } from "./types.js";
 
 export const tools: McpTool<any>[] = [
@@ -16,6 +17,7 @@ export const tools: McpTool<any>[] = [
   getTrainTimetableTool,
   getTrainRouteMapTool,
   getTrainsApproachingStationTool,
+  getTrainSpeedTool,
 ];
 
 

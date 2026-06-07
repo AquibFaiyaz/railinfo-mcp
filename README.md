@@ -38,9 +38,16 @@ Get the precise geographic coordinates of a train's entire route.
 * **Map Integration**: Generates clickable Google Maps links for every station to plot or visualize the path.
 
 ### 7. Trains Approaching Station (Radar) (`get_trains_approaching_station`)
-Get active, live trains physically approaching a station within a specified radius (default 50 km, max 100 km).
+Get active, live trains physically approaching a station within a specified radius (default 50 km, max 600 km).
 * **Spatial Tracking**: Tracks live coordinates of active trains approaching the station.
 * **Smart Filter**: Automatically ignores trains that have already departed or are moving away from the station.
+
+### 8. Train Speed and Tracking Source (`get_train_speed`)
+Get the current speed and GPS tracking information of an active train.
+* **Live Speedometer**: Returns speed in km/h.
+* **Locomotive Information**: Returns locomotive number and connection status.
+* **Data Freshness and Source**: Exposes data source (GPS vs NTES) and data age.
+
 
 ---
 

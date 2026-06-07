@@ -11,7 +11,7 @@ function formatLiveTrainStatusSummary(status: any): string {
   const lines = [
     `Train: ${status.trainName} (${status.trainNo})`,
     `Start Date: ${status.startDate}`,
-    `Current location: ${status.currentLocation} (${status.stationCode})`,
+    `Current location: ${status.currentStation} (${status.stationCode})`,
   ];
 
   if (status.targetStationInfo) {

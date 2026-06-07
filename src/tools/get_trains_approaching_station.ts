@@ -46,7 +46,7 @@ export const getTrainsApproachingStationTool: McpTool<{
     radiusKm: z
       .number()
       .min(1)
-      .max(100)
+      .max(600)
       .optional()
       .describe(TRAINS_APPROACHING_STATION_PROMPTS.PARAM_RADIUS_KM),
   },

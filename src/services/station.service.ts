@@ -163,6 +163,8 @@ export async function getTrainsAtStation(
           results.push({
             trainNo: details.train_no,
             trainName: details.train_name,
+            stationCode: liveStop.station_code,
+            stationName: liveStop.station_name,
             sta: liveStop.sta || "Source",
             std: liveStop.std || "Destination",
             eta: liveStop.eta || "Source",
