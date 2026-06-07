@@ -170,7 +170,7 @@ We have implemented a new MCP tool `get_train_route_map` which retrieves the com
 
 ## 📡 New Feature: Trains Approaching Station (Radar) Tool
 
-We have implemented a new MCP tool `get_trains_approaching_station` which fetches active, live trains physically approaching a target station within a specified radius (up to 100 km).
+We have implemented a new MCP tool `get_trains_approaching_station` which fetches active, live trains physically approaching a target station within a specified radius (up to 600 km).
 
 ### 🛠️ Changes Implemented
 
@@ -182,7 +182,7 @@ We have implemented a new MCP tool `get_trains_approaching_station` which fetche
 
 3. **Tool Definition**:
    - Created [src/tools/get_trains_approaching_station.ts](file:///Users/aquibfaiyaz/Desktop/Learning%20Resources/MCP%20projects/railinfo-mcp/src/tools/get_trains_approaching_station.ts) for Zod inputs and markdown table outputs.
-   - Enforced search radius constraints (min: 1 km, max: 100 km, default: 50 km).
+   - Enforced search radius constraints (min: 1 km, max: 600 km, default: 50 km).
 
 4. **Tool Registry**:
    - Registered `getTrainsApproachingStationTool` inside [src/tools/index.ts](file:///Users/aquibfaiyaz/Desktop/Learning%20Resources/MCP%20projects/railinfo-mcp/src/tools/index.ts).
